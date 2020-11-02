@@ -1,23 +1,29 @@
-
-
 #include "AntColony.h"
 #include <cmath>
 #include <random>
 #include <vector>
+#include <limits>
 #include "utility.h"
+#include <iostream>
+#include <unistd.h>
+#include <chrono>
+#include <iomanip>
 using namespace std;
+constexpr float minimum_p = numeric_limits<float>::epsilon();
 
 // Constructor assumes fully connected sysmetric graph give by a list of coordinates that distances can be calulated from
 AntColony::AntColony(const std::vector<std::pair<float,float>> &symmetricCoordinates) : numberOfNodes(symmetricCoordinates.size())
 {
-    bestTour.reserve(numberOfNodes);
+    generator.seed(chrono::high_resolution_clock::now().time_since_epoch().count() / getpid());
+    numberOfAnts = 10;
+    bestTour.reserve(numberOfNodes + 1);
     distances = new_2D_array<int>(numberOfNodes, numberOfNodes);
     pheromones = new_2D_array<float>(numberOfNodes, numberOfNodes);
     graph = new_2D_array<bool>(numberOfNodes, numberOfNodes);
     tours = new_2D_array<int>(numberOfAnts, numberOfNodes + 1);
 
     nodeCoordinates = new Coordinate[numberOfNodes];
-    for(int i = 0; i < symmetricCoordinates.size(); i++){
+    for(size_t i = 0; i < symmetricCoordinates.size(); i++){
         nodeCoordinates[i].x = symmetricCoordinates[i].first;
         nodeCoordinates[i].y = symmetricCoordinates[i].second;
     }
@@ -30,27 +36,27 @@ AntColony::AntColony(const std::vector<std::pair<float,float>> &symmetricCoordin
 }
 
 AntColony::~AntColony(){
+    delete_2D_array<int>(numberOfAnts, numberOfNodes + 1, tours);
     delete_2D_array<int>(numberOfNodes, numberOfNodes, distances);
     delete_2D_array<float>(numberOfNodes, numberOfNodes, pheromones);
     delete_2D_array<bool>(numberOfNodes, numberOfNodes, graph);
-    delete_2D_array<int>(numberOfNodes, numberOfNodes, tours);
     delete[] nodeCoordinates;
 }
 
 
 
-AntColony& AntColony::optimize(int iterations = 100, float rho = 0.1, float beta = 2, float decay = 0.1, float qExplorationFactor=0.9)
+AntColony& AntColony::optimize(int iterations , int numberOfAnts, float rho , float beta , float decay , float qExplorationFactor)
 {
-    setParameters(iterations, rho, beta, decay, qExplorationFactor);
+    setParameters(iterations, numberOfAnts, rho, beta, decay, qExplorationFactor);
     reset();
+    
     for (int i = 0; i < iterations; i++)
     {
 
         // Send out ants
         for (int a = 0; a < numberOfAnts; a++)
         {
-            while (!findAntTour(a))
-                ;
+            while (!findAntTour(a));
         }
 
         findBestTour();
@@ -58,21 +64,48 @@ AntColony& AntColony::optimize(int iterations = 100, float rho = 0.1, float beta
     }
     return *this;
 }
+AntColony& AntColony::setParameters(int iterations, int numberOfAnts, float rho, float beta, float decay, float qExplorationFactor)
+{
+        this->iterations = iterations;
+        if(this->numberOfAnts != numberOfAnts){
+        //delete_2D_array(this->numberOfAnts, numberOfNodes + 1, tours);
+        this->numberOfAnts = numberOfAnts;
+        this->antsChanged = true;
+        }
+        this->rho = rho;
+        this->beta = beta;
+        this->decay = decay;
+        this->q0 = qExplorationFactor;
+        return *this;
+}
 
 void AntColony::reset(){
+    if(antsChanged)
+    {
+        tours = new_2D_array<int>(numberOfAnts, numberOfNodes + 1);
+        antsChanged = false;
+    }
+    
+    resetTour(0);
+    
+    uniform_int_distribution<int> random_value(0, numberOfNodes - 1);
 
-    uniform_real_distribution<int> random_value(0, numberOfNodes - 1);
     nearistNeighbor(random_value(generator));
 
     bestTour_index = 0;
     bestTour_length = length(0);
-    q0 = (1 / (float)bestTour_length) * numberOfNodes;
+    for(int i = 0; i < numberOfNodes + 1; i++){
+        bestTour.push_back(tours[bestTour_index][i]);
+    }
+    cout << "First best tour: " << bestTour_length << endl;
+    initialPheromones = 1 / ((float)bestTour_length * numberOfNodes);
+    
     for(int i = 0; i < numberOfNodes; i++){
-        for(int j = 0; j < numberOfNodes; j++){
-            pheromones[i][j] = q0;
+        for(int j = i; j < numberOfNodes; j++){
+                    pheromones[i][j] = initialPheromones;
+                    pheromones[j][i] = initialPheromones;
         }
     }
-    
 }
 
 void AntColony::nearistNeighbor(int node){
@@ -81,14 +114,17 @@ void AntColony::nearistNeighbor(int node){
     for(int i = 1; i < numberOfNodes; i++){
         tour[i] = shortestDistance(tour[i-1]);
     }
+    tour[numberOfNodes] = tour[0];
 }
 
 int AntColony::shortestDistance(int node)
-{
-    int min = distances[node][0];
-    int min_index = 0;
+{   int min = numeric_limits<int>::max();
+    int min_index = -1;
     for(int n = 0; n < numberOfNodes; n++){
-        if(n != node && min > distances[node][n]){
+        if(n == node) continue;
+        
+        
+        if(!visited(0,n) && min > distances[node][n]){
             min = distances[node][n];
             min_index = n;
         }
@@ -108,17 +144,19 @@ vector<int> AntColony::getShortestTour()
 
 bool AntColony::findAntTour(int ant)
 {
-    uniform_real_distribution<int> random_value(0, numberOfNodes - 1);
-    int *tour = tours[ant];
+    resetTour(ant);
+    uniform_int_distribution<int> random_value(0, numberOfNodes - 1);
+    int * tour = tours[ant];
     tour[0] = random_value(generator);
     for (int i = 1; i < numberOfNodes; i++)
     {
         int node = tour[i - 1];
         int choice = chooseNextNode(ant, node);
+        
         if (choice == -1)
             return false;
-        updateLocalPheromone(node,choice); // Will need to be atomic
         tour[i] = choice;
+        updateLocalPheromone(node,choice); // Will need to be atomic
     }
     tour[numberOfNodes] = tour[0];
     updateLocalPheromone(tour[numberOfNodes],tour[0]);
@@ -130,6 +168,7 @@ int AntColony::chooseNextNode(int ant, int currentNode)
 {
     std::uniform_real_distribution<float> random_value(0.0, 1.0);
     float q = random_value(generator);
+    
     if (q < q0)
     {
         return maxPheromoneChoice(ant, currentNode);
@@ -139,39 +178,41 @@ int AntColony::chooseNextNode(int ant, int currentNode)
 
 int AntColony::maxPheromoneChoice(int ant, int currentNode)
 {
-    float max = 0;
+    float max = numeric_limits<float>::min();
     int bestNode = -1;
+    float current;
     for (int n = 0; n < numberOfNodes; n++)
     {
-        float current = pheromones[currentNode][n] * distanceHeuristic(currentNode, n);
+        if (n == currentNode || visited(ant,n) || !exists(currentNode,n)) continue;
+        
+        current = pheromones[currentNode][n] * distanceHeuristic(currentNode, n);
         if (current > max)
         {
             bestNode = n;
             max = current;
         }
     }
+    
     return bestNode;
 }
 
 
 float AntColony::distanceHeuristic(int nodeA, int nodeB)
 {
-    return pow(1 / distances[nodeA][nodeB], beta);
+    return pow((1 / ((float)distances[nodeA][nodeB])), beta);
 }
 
 int AntColony::biasedExplorationChoice(int ant, int currentNode)
 {
-    int count = 0;
     float sum = 0;
     uniform_real_distribution<float> random_value(0.0, 1.0);
     float threshold = random_value(generator);
     for (int n = 0; n < numberOfNodes; n++)
     {
-        if (n == currentNode)
+        if (n == currentNode || visited(ant, n) || !exists(currentNode, n) )
             continue;
 
-        if (exists(currentNode, n) && !visited(ant, n))
-            sum += probabilityCalculation(currentNode, n, ant);
+        sum += probabilityCalculation(currentNode, n, ant);
 
         if (sum > threshold)
             return n;
@@ -181,7 +222,7 @@ int AntColony::biasedExplorationChoice(int ant, int currentNode)
 
 float AntColony::probabilityCalculation(int nodeA, int nodeB, int ant)
 {
-    float sum = 0.0;
+    float sum =  0;
     for (int n = 0; n < numberOfNodes; n++)
     {
         if (exists(nodeA, n) && !visited(ant, n))
@@ -195,15 +236,17 @@ float AntColony::probabilityCalculation(int nodeA, int nodeB, int ant)
 // We will use the pheromoneMatrix[nodeA][nodeB] = (1 - Rho)*pheromoneMatrix[nodeA][nodeB] + (Rho)*initialPheromoneLevel
 void AntColony::updateLocalPheromone(int nodeA, int nodeB)
 {
-    pheromones[nodeA][nodeB] = (1 - rho) * pheromones[nodeA][nodeB] + rho * initialPheromones;
+    pheromones[nodeA][nodeB] = max(minimum_p, (1 - rho) * pheromones[nodeA][nodeB] + rho * initialPheromones);
+    pheromones[nodeB][nodeA] = pheromones[nodeA][nodeB]; // Change this if not symetrical problems
 }
 
 void AntColony::updateGlobalPheromones()
 {
     for (int i = 0; i < numberOfNodes; i++)
     {
-        for (int j = 0; i < numberOfNodes; j++)
+        for (int j = 0; j < numberOfNodes; j++)
         {
+            if(i == j) continue;
             pheromones[i][j] = (1 - decay) * pheromones[i][j] + decay * deltaPheromones(i, j);
         }
     }
@@ -225,7 +268,7 @@ void AntColony::findBestTour()
     bestTour_length = bestlength;
     bestTour_index = bestAnt;
     bestTour.clear();
-    for(int i = 0; i < numberOfNodes; i++){
+    for(int i = 0; i < numberOfNodes + 1; i++){
         bestTour.push_back(tours[bestTour_index][i]);
     }
 }
@@ -241,7 +284,6 @@ float AntColony::deltaPheromones(int nodeA, int nodeB)
 
 bool AntColony::inGlobalBest(int nodeA, int nodeB)
 {
-    int* bestTour = tours[bestTour_index];
     for (int i = 0; i < numberOfNodes - 1; i++)
     {
         if (bestTour[i] == nodeA && bestTour[(i + 1)] == nodeB)
@@ -253,7 +295,7 @@ bool AntColony::inGlobalBest(int nodeA, int nodeB)
 
 void AntColony::resetTour(int ant)
 {
-    for (int i = 0; i < numberOfNodes; i++)
+    for (int i = 0; i < numberOfNodes + 1; i++)
     {
         tours[ant][i] = -1;
     }
@@ -269,7 +311,7 @@ int AntColony::distance(int nodeA, int nodeB)
 
 long AntColony::length(int ant)
 {
-    int *tour = tours[ant];
+    int * tour = tours[ant];
     long sum = 0;
     for (int i = 0; i < numberOfNodes - 1; i++)
     {
@@ -279,17 +321,19 @@ long AntColony::length(int ant)
 }
 
 bool AntColony::exists(int nodeA, int nodeB)
-{
-    return graph[nodeA][nodeB];
+{   
+    // Currently assuming symetrical complete graphs
+    return true;
+    // return graph[nodeA][nodeB];
 }
 
 bool AntColony::visited(int ant, int node)
 {
-    int *tour = tours[ant];
+    int * tour = tours[ant];
     for (int i = 0; i < numberOfNodes; i++)
     {
         if (tour[i] == -1)
-            break;
+            return false;
         if (tour[i] == node)
             return true;
     }
@@ -305,3 +349,47 @@ void AntColony::initDistanceMatrix(){
         }
     }
 }
+
+
+void AntColony::printCurrentState(){
+    cout << "rho: " << rho << ", decay: " << decay << ", numberOfAnts: " << numberOfAnts << ", Number of Nodes: " << numberOfNodes << ", iterations: "
+        << iterations << ", beta: " << beta << ", q0: " << q0  << " , initialPheromones: " << initialPheromones << "\n";
+    
+    cout << "Best Tour length: " << bestTour_length << "\n";
+    cout << "Tour: ";
+    for(int i = 0; i < numberOfNodes; i++){
+        cout << tours[bestTour_index][i] << " -> ";
+    }
+     cout << tours[bestTour_index][numberOfNodes];
+    cout << endl;
+}
+
+void AntColony::printDistanceMatrix(){
+    cout << "Distance Matrix" << "\n";
+    for(int j = 0; j < numberOfNodes; j++){
+            cout << j << " ";
+    }   
+    cout << "\n";
+    for(int i = 0; i < numberOfNodes; i++){
+        cout << i << ": ";
+        for(int j = 0; j < numberOfNodes; j++){
+            cout << distances[i][j] << " ";
+    }   
+        cout << "\n";
+    }
+    cout << endl;
+}
+
+void AntColony::printPheromones(){
+    cout << setprecision(2);
+    for(int i = 0; i < numberOfNodes; i++){
+        cout << i << ": ";
+        for(int j = 0; j < numberOfNodes; j++){
+            cout << pheromones[i][j] << " ";
+    }   
+        cout << "\n";
+    }
+    cout << endl;
+}
+
+

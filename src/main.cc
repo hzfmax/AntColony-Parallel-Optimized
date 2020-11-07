@@ -19,21 +19,20 @@ int main(int argc, char * argv[])
         return -1;
     }
     int iterations = 1;
-    int numberOfPoints = 20;
+    //int numberOfPoints = 20;
     if(argc > 2)
         iterations = atoi(argv[2]);
-    if(argc > 3)
-        numberOfPoints =atoi(argv[3]);
+    // if(argc > 3)
+    //     numberOfPoints =atoi(argv[3]);
     
     vector<pair<float, float>> tspData = readTspFile(argv[1]);
-    tspData.resize(numberOfPoints);
+    //tspData.resize(numberOfPoints);
     initialize_timer();
     AntColony ac(tspData);
     start_timer();
     ac.optimize(iterations);
     stop_timer();
 
-    ac.printCurrentState();
     cout << "The best tour length was: " << ac.getShortestTourLength() << " Found in :" << elapsed_time() << endl;
     char data [250];
     sprintf(data, "%lf", elapsed_time());

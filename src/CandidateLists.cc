@@ -1,101 +1,142 @@
 #include <cstdint>
 #include <cstdlib>
 #include "CandidateLists.h"
-typedef uint_fast32_t u_int;
+#include "utility.h"
+#include <vector>
+#include <iostream>
 #define DISTANCE_SPACE 2
 #define SPACE_FOR_VARIABLE 1
-#define BIT_WIDTH 32
-#define nodeListIndex(n) (CL_TIER_SIZE * DISTANCE_SPACE + SPACE_FOR_VARIABLE) * n
+#define BIT_WIDTH 31
+#define nodeListIndex(n, ts) (ts * DISTANCE_SPACE + SPACE_FOR_VARIABLE) * n
 #define tierIndex(t) (CL_TIER_SIZE * DISTANCE_SPACE + SPACE_FOR_VARIABLE) * numberOfNodes * t
 #define nodeIndex(i)  i + SPACE_FOR_VARIABLE
-#define distanceIndex(i) CL_TIER_SIZE + i + SPACE_FOR_VARIABLE
-#define getExactDistanceIndex(t,n,i) tierIndex(t) + nodeListIndex(n) + distanceIndex(i)
-#define getExactNodeIndex(t,n,i) tierIndex(t) + nodeListIndex(n) + nodeIndex(i)
-
-struct pair{
-    pair() = default;
-    pair(u_int n, u_int d) : node(n), distance(d){};
-    u_int node;
-    u_int distance;
-};
+#define distanceIndex(i,ts) ts + i + SPACE_FOR_VARIABLE
+#define getExactDistanceIndex(t,n,i,ts) tierIndex(t) + nodeListIndex(n, ts) + distanceIndex(i,ts)
+#define getExactNodeIndex(t,n,i,ts) tierIndex(t) + nodeListIndex(n, ts) + nodeIndex(i)
+using namespace std;
 
 int compare(const void* p1, const void* p2){
-    return ((pair*)p1)->distance - ((pair*)p2)->distance;
+    return ((Node*)p1)->distance - ((Node*)p2)->distance;
 }
 
-CandidateLists::CandidateLists(u_int numberOfNodes, u_int ** distances){
+CandidateLists::CandidateLists(unsigned int numberOfNodes, unsigned int ** distances){
     numberOfTiers = numberOfNodes / CL_TIER_SIZE;
+    remainderTierSize = numberOfNodes % CL_TIER_SIZE;
+    if(remainderTierSize){
+        numberOfTiers++;
+    } else{
+        remainderTierSize = CL_TIER_SIZE;
+    }
     this->numberOfNodes  = numberOfNodes;
-    totalSize = (numberOfNodes*DISTANCE_SPACE + SPACE_FOR_VARIABLE) * numberOfNodes;
-    pair** es = new pair*[numberOfNodes*numberOfNodes];
+    
+    Node** es = new Node*[numberOfNodes];
 
-    for(u_int i = 0; i < numberOfNodes; i++){
-        es[i] = new pair[numberOfNodes];
-        for(u_int j = 0; j < numberOfNodes; j++){
-            es[i][j] = pair(j, distances[i][j]);
+    for(unsigned int i = 0; i < numberOfNodes; i++){
+        es[i] = new Node[numberOfNodes];
+        for(unsigned int j = 0; j < numberOfNodes; j++){
+            es[i][j] = Node(j, distances[i][j]);
         }
     }
 
-    for(int i = 0; i < numberOfNodes; i++){
-        qsort(es[i], numberOfNodes, sizeof(pair), compare);
+    for(unsigned int i = 0; i < numberOfNodes; i++){
+        qsort(es[i], numberOfNodes, sizeof(Node), compare);
     }
-    u_int tier = 0;
-    u_int total = 0;
-    cLists = new u_int[totalSize];
-    for(u_int i = 0; i < numberOfNodes; i++){
-        for(u_int j = 0; j < numberOfNodes; j++){
-            cLists[getExactNodeIndex(tier,i,j)] = es[i][j].node;
-            cLists[getExactDistanceIndex(tier,i,j)] = es[i][j].distance;
-            total++;
+    
+    totalSize = numberOfNodes*DISTANCE_SPACE* numberOfNodes + SPACE_FOR_VARIABLE*numberOfNodes*numberOfTiers;
+    cLists = new unsigned int[totalSize];
 
-            if(total % CL_TIER_SIZE == 0){
-                tier++;
-                cLists[tierIndex(tier) + nodeListIndex(i)] = CL_TIER_SIZE;
+
+    unsigned int tier_size = CL_TIER_SIZE;
+    
+    for(unsigned int t = 0; t < numberOfTiers; t++){
+        unsigned int indexStart = t*tier_size;
+            if(t == numberOfTiers - 1){
+                tier_size = remainderTierSize;
             }
+    for(unsigned int n = 0; n < numberOfNodes; n++){
+            cLists[tierIndex(t) + nodeListIndex(n,tier_size)] = tier_size;
+            for(unsigned int j = 0; j < tier_size; j++){
+                cLists[getExactNodeIndex(t,n,j,tier_size)] = es[n][indexStart+j].nodeId;
+                cLists[getExactDistanceIndex(t,n,j,tier_size)] = es[n][indexStart+j].distance;
+                }
         }
     }
-}
-
-u_int CandidateLists::getNode(u_int tier, u_int node, u_int index) const {
-    return cLists[getExactNodeIndex(tier, node, index)];
-}
-
-u_int CandidateLists::getDistance(u_int tier, u_int node, u_int index) const {
-    return cLists[getExactDistanceIndex(tier,node,index)];
-}
-u_int CandidateLists::getNumberLeftInTier(u_int tier, u_int node) const {
-    return cLists[tierIndex(tier) + nodeListIndex(node)];
-}
-
-u_int CandidateLists::getFirstUnmarkedTier(){
-    return currentUnmarkedTier;
-}
-
-void CandidateLists::markNode(u_int tier, u_int node, u_int index){
-    cLists[getExactNodeIndex(tier,node,index)] |= (1U << BIT_WIDTH);
-    u_int countIndex = tierIndex(tier) + nodeListIndex(node);
-    if(cLists[countIndex] - 1 > 0)
-        cLists[countIndex]--;
-    else if(cLists[countIndex] - 1 == 0){
-        cLists[countIndex]--;
-        currentUnmarkedTier++;
+    for(unsigned int i = 0; i < numberOfNodes; i++){
+        delete[] es[i];
     }
+    delete[] es;
 }
 
-inline bool CandidateLists::isValueMarked(u_int value) const {
-    return value & (1U << BIT_WIDTH);
+CandidateLists::~CandidateLists(){
+    delete [] cLists;
 }
 
-void CandidateLists::reset() {
-    for(int i=0; i < totalSize; i++){
-    cLists[i] &= ~(1U << BIT_WIDTH);
+unsigned int CandidateLists::getTierSize(unsigned int tier) const 
+{   
+    if(tier == numberOfTiers - 1)
+        return remainderTierSize;
+    return CL_TIER_SIZE;
+} 
+
+unsigned int CandidateLists::findNodesDistance(unsigned int nodeA, unsigned int nodeB) const{
+    unsigned int tier_size = CL_TIER_SIZE;
+    for(unsigned int t = 0; t < numberOfTiers; t++){
+        if(t == numberOfTiers - 1)
+                tier_size = remainderTierSize;
+            for(unsigned int j = 0; j < tier_size; j++){
+                if(cLists[getExactNodeIndex(t,nodeA,j,tier_size)] == nodeB)
+                    return cLists[getExactDistanceIndex(t,nodeA,j,tier_size)];
+            }
     }
-    for(int i=0; i < numberOfNodes; i++){
-        for(int t = 0; t < numberOfTiers; t++){
-            cLists[tierIndex(tier) + nodeListIndex(node)] = CL_TIER_SIZE;
+    return 0;
+}
+
+//TODO: Throw Exception if index's are out of bounds
+unsigned int CandidateLists::getNode(unsigned int tier, unsigned int node, unsigned int index) const {
+    unsigned int tier_size = CL_TIER_SIZE;
+    if(tier == numberOfTiers - 1)
+        tier_size = remainderTierSize;
+    return cLists[getExactNodeIndex(tier, node, index, tier_size)];
+}
+
+//TODO: Throw Exception if index's are out of bounds
+unsigned int CandidateLists::getDistance(unsigned int tier, unsigned int node, unsigned int index) const {
+    unsigned int tier_size = CL_TIER_SIZE;
+    if(tier == numberOfTiers - 1)
+        tier_size = remainderTierSize;
+    return cLists[getExactDistanceIndex(tier,node,index, tier_size)];
+}
+
+//TODO: Throw Exception if index's are out of bounds
+unsigned int CandidateLists::getNumberLeftInTier(unsigned int tier, unsigned int node) const {
+    unsigned int tier_size = CL_TIER_SIZE;
+    if(tier == numberOfTiers - 1)
+        tier_size = remainderTierSize;
+    return cLists[tierIndex(tier) + nodeListIndex(node, tier_size)];
+}
+
+//TODO: Throw Exception if index's are out of bounds
+const unsigned int * CandidateLists::getTierList(unsigned int tier, unsigned int node) const{
+    unsigned int tier_size = CL_TIER_SIZE;
+    if(tier == numberOfTiers - 1)
+        tier_size = remainderTierSize;
+    return cLists + tierIndex(tier) + nodeListIndex(node,tier_size) + 1;
+}
+
+
+void CandidateLists::printCandidateLists(){
+    unsigned int tier_size = CL_TIER_SIZE;
+    for(unsigned int t = 0; t < numberOfTiers; t++){
+        if(t == numberOfTiers - 1)
+                tier_size = remainderTierSize;
+        for(unsigned int i = 0; i < numberOfNodes; i++){
+            for(unsigned int j = 0; j < tier_size; j++){
+                cout << " (" << getNode(t,i,j) << "," << getDistance(t,i,j)  << ") ";
+            }
+            cout << "\n";
         }
     }
-    currentUnmarkedTier = 0;
+    cout << endl;
 }
 
 

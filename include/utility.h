@@ -1,6 +1,7 @@
 #ifndef U_H
 #define H
 
+
 template<typename T>
 T**  new_2D_array(int rows, int columns);
 

@@ -3,7 +3,9 @@
 #include <vector>
 #include <utility>
 #include <random>
-#include <time.h>
+#include "time.h"
+#include "Tour.h"
+#include "CandidateLists.h"
 // TODO: Write macros to convert 1D into 2D coordinates
 // TODO: Hold all arrays as 1D arrays instead of 2D
 
@@ -29,23 +31,21 @@ public:
     AntColony &optimize(int iterations = 100, int numberOfAnts = 10, float rho = 0.1, float beta = 2, float decay = 0.1, float qExplorationFactor = 0.9);
     AntColony &setParameters(int iterations, int numberOfAnts, float rho, float beta, float decay, float qExplorationFactor);
     long getShortestTourLength();
-    std::vector<int> getShortestTour(); // Returns a copy of the shortest tour by node index - Maybe make into better format latter
-    void printCurrentState();
-    void printDistanceMatrix();
-    void printPheromones();
+    Tour* getShortestTour(); 
+    // void printCurrentState();
+    // void printDistanceMatrix();
+    // void printPheromones();
 
 private:
     // Data Storage
-    int **distances;             // Node x Node  edge matrix that gives edge distance from city1->city2 in [city1][city2] and city2->city1 with [city2][city1]
-    float **pheromones;          // Node x Node edge matrix that holds the global pheromone values
-    bool **graph;                // determines which neighbors are valid
-    Coordinate *nodeCoordinates; // Nodes with their coordinates for calculating distances
-    int **tours;                 // Ant X Node matrix, holding each Ant's current Tour.
+    float **pheromones;          // Node x Node edge matrix that holds the global pheromone value
+    std::vector<Tour*> tours;
+    CandidateLists* candidateLists; 
+    Coordinate * nodeCoordinates;                // 
     int numberOfNodes;
-    std::vector<int> bestTour;
+    Tour* bestTour;
     int numberOfAnts;
     int iterations;
-    bool antsChanged = false;
     // Parameters
 
     float rho;   // this is parameter that adjusts the ratio of the update for the local update
@@ -58,7 +58,7 @@ private:
     std::mt19937 generator;
 
     void reset();
-    void initDistanceMatrix();
+    void initDistanceMatrix(unsigned int ** distances);
     void nearistNeighbor(int node);
     int shortestDistance(int node);
 
@@ -66,23 +66,20 @@ private:
 
     void updateLocalPheromone(int nodeA, int nodeB); // We will use the pheromoneMatrix[nodeA][nodeB] = (1 - Rho)*pheromoneMatrix[nodeA][nodeB] + (Rho)*initialPheremoneLevelOfedge
 
-    int chooseNextNode(int ant, int currentNode); // Takes in the current city returns the choice for where to move to next // State Transition Rule
-    int maxPheromoneChoice(int ant, int currentNode);
-    int biasedExplorationChoice(int ant, int currentNode); // This is the biased Exploration from the original Ant System algorithm, use when random is below a certian threshold
-    float probabilityCalculation(int nodeA, int nodeB, int ant);
+    void chooseNextNode(Tour * tour, int currentNode, Node & n); // Takes in the current city returns the choice for where to move to next // State Transition Rule
+    void maxPheromoneChoice(Tour * tour, int currentNode, Node & best);
+    // Node biasedExplorationChoice(int ant, int currentNode); // This is the biased Exploration from the original Ant System algorithm, use when random is below a certian threshold
+    // float probabilityCalculation(int nodeA, int nodeB, unsigned int d);
 
     void updateGlobalPheromones();
 
     void findBestTour();
-    bool inGlobalBest(int nodeA, int nodeB);
     float deltaPheromones(int nodeA, int nodeB);
 
     int distance(int nodeA, int nodeB);
-    float distanceHeuristic(int nodeA, int nodeB);
-    long length(int ant);
-    bool exists(int nodeA, int nodeB);
-    bool visited(int ant, int node);
-    void resetTour(int ant);
+    float distanceHeuristic(unsigned int d);
+    // bool exists(int nodeA, int nodeB); // Depracted until I add more support for different types of graphs
+    // void resetTour(int ant);
 };
 
 #endif

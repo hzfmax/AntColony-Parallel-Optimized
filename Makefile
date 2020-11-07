@@ -26,11 +26,9 @@ clean:
 	@echo " $(RM) -r $(BUILDDIR) $(TARGET)"; $(RM) -r $(BUILDDIR) $(TARGET)
 
 # Tests
-tester:
-	$(CC) $(CFLAGS) test/tester.cpp $(INC) $(LIB) -o bin/tester
 
 # Spikes
 ticket:
-	$(CC) $(CFLAGS) spikes/ticket.cpp $(INC) $(LIB) -o bin/ticket
+	$(CC) $(CFLAGS) spikes/ticket.cc $(INC) $(LIB) -o bin/ticket
 
 .PHONY: clean

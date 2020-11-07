@@ -48,8 +48,11 @@ Ant colony Optimization with 3 opt added based on this [paper](http://people.ids
 -Compute the distance on the fly for values outside those 20, as the algorithm will in general, not select them - or in the ase of 3-opt not use them at all. 
 -Initial implementation for ease: NxN matrix of chars represening the graph: 1 for connected, 0 for not
 - (Fututre improvements)
-For values outside these 15, we store the valid neighbors as 1D array, where the second dimnesion is along the bit axis. We store a bit pattern that has 1 at every index that is a valid neighbor. When searching for next neighbor to visit, if force outside of top 15, we use a bit mask to determine if the bit is turned on, if it is we compute the relative index, and check that index against the current ant's tour. If it is a valid neighbor and 
-- 
+- For values outside these 15, we store the valid neighbors as 1D array, where the second dimnesion is along the bit axis. We store a bit pattern that has 1 at every index that is a valid neighbor. When searching for next neighbor to visit, if force outside of top 15, we use a bit mask to determine if the bit is turned on, if it is we compute the relative index, and check that index against the current ant's tour. If it is a valid neighbor and 
+
+- Tour's have both the node's and the distances of associated steps stored and the current length stored at the very back. Orginized into a Class.
+
+- **Make Class called Graph that has optimized performance and exposes methods to AntColony, so I can change the graph implementation without changing the AntColony Implementation too much**
 ### Memory Usage Anaylsis:
 Each Ant needs a unique Tour. N x Ants 
 Pheromone Matrix: N x N

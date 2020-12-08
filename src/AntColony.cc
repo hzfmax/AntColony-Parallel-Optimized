@@ -10,6 +10,7 @@
 #include <iomanip>
 #include "Tour.h"
 #include "CandidateLists.h"
+#include <omp.h>
 using namespace std;
 constexpr float minimum_p = numeric_limits<float>::epsilon();
 
@@ -47,11 +48,14 @@ AntColony& AntColony::optimize(int iterations , int numberOfAnts, float rho , fl
     for (int i = 0; i < iterations; i++)
     {
         // Send out ants
+        
+        #pragma omp parallel for
         for (int a = 0; a < numberOfAnts; a++)
         {
-            while (!findAntTour(a));
+            // while (!findAntTour(a));
+            findAntTour(a);
         }
-
+    
         findBestTour();
         updateGlobalPheromones();
     }
@@ -129,7 +133,10 @@ bool AntColony::findAntTour(int ant)
         Node choice;
         chooseNextNode(tour, node, choice);
         tour->add(choice);
-        updateLocalPheromone(node,choice.nodeId); // Will need to be atomic
+        #pragma omp critical
+        {
+            updateLocalPheromone(node,choice.nodeId);
+        }
     }
     updateLocalPheromone(tour->getNode(numberOfNodes-1),tour->getNode(numberOfNodes));
     return true;
@@ -213,12 +220,14 @@ void AntColony::updateLocalPheromone(int nodeA, int nodeB)
 
 void AntColony::updateGlobalPheromones()
 {
+    #pragma omp parallel for
     for (int i = 0; i < numberOfNodes; i++)
     {
-        for (int j = 0; j < numberOfNodes; j++)
+        for (int j = i; j < numberOfNodes; j++)
         {
             if(i == j) continue;
             pheromones[i][j] = (1 - decay) * pheromones[i][j] + decay * deltaPheromones(i, j);
+            pheromones[j][i] = pheromones[i][j];
         }
     }
 }
@@ -260,6 +269,7 @@ int AntColony::distance(int nodeA, int nodeB)
 
 // Currently assumes symmetrical distances
 void AntColony::initDistanceMatrix(unsigned int ** distances){
+    #pragma omp parallel for
     for(int i = 0; i < numberOfNodes; i++){
         for(int j = i; j < numberOfNodes; j++){
             distances[i][j] = distance(i,j);

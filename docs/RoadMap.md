@@ -1,0 +1,6 @@
+- Implement OpenMP solution:
+    - Collect Data and make some graphs
+- Implement a 3-opt
+    - Collect OpenMP vs non-openMP
+-Impelement CUDA 3-opt solution
+    - Collect and compare vs non-cuda and non-open mp

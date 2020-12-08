@@ -8,6 +8,7 @@
 #include <sstream>
 #include "timer.h"
 #include "write_results.h"
+#include <omp.h>
 using namespace std;
 
 vector<pair<float, float>> readTspFile(const string & filename);
@@ -19,14 +20,16 @@ int main(int argc, char * argv[])
         return -1;
     }
     int iterations = 1;
-    //int numberOfPoints = 20;
+    int numberOfPoints = 0;
     if(argc > 2)
         iterations = atoi(argv[2]);
-    // if(argc > 3)
-    //     numberOfPoints =atoi(argv[3]);
+     if(argc > 3)
+         numberOfPoints =atoi(argv[3]);
     
     vector<pair<float, float>> tspData = readTspFile(argv[1]);
-    //tspData.resize(numberOfPoints);
+    if(numberOfPoints){
+    tspData.resize(numberOfPoints);
+    }
     initialize_timer();
     AntColony ac(tspData);
     start_timer();

@@ -4,7 +4,7 @@
 #include "Tour.h"
 #define CATCH_CONFIG_MAIN
 #include "catch_amalgamated.h"
-constexpr unsigned int CANDIDATE_LIST_SIZE = 25U;
+constexpr unsigned int CANDIDATE_LIST_SIZE = 10U;
 
 
 unsigned int ** initDistanceArray(){

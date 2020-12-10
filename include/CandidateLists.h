@@ -22,7 +22,8 @@ public:
     unsigned int getTierSize(unsigned int tier) const; 
     const unsigned int * getTierList(unsigned int tier, unsigned int node) const;
     void printCandidateLists();
-    unsigned int findNodesDistance(unsigned int nodeA, unsigned int nodeB) const;
+    unsigned int getNumberOfNodes(){return numberOfNodes;}
+    unsigned int nodeDistance(unsigned int nodeA, unsigned int nodeB) const;
     ~CandidateLists();
 
 private:
@@ -31,6 +32,7 @@ private:
     unsigned int numberOfTiers;
     unsigned int numberOfNodes;
     unsigned int remainderTierSize;
+    unsigned int ** distances;
     
     // A particular node's candidate list will include all nodes and distances associated with that that Node. Nodes will be ordered shortest distance to longest. I will split the Node's list into sub N/M Tiers
     // where N is number of nodes and M is number of elements considered by the algorithm in one step. Tier 0 is considered first by the search algorithms. Only if none of Tier 0 will we procceed to Tier 1.

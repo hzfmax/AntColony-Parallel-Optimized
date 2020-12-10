@@ -30,7 +30,8 @@ CandidateLists::CandidateLists(unsigned int numberOfNodes, unsigned int ** dista
     this->numberOfNodes  = numberOfNodes;
     
     Node** es = new Node*[numberOfNodes];
-
+    this->distances = distances;
+    #pragma omp parallel for
     for(unsigned int i = 0; i < numberOfNodes; i++){
         es[i] = new Node[numberOfNodes];
         for(unsigned int j = 0; j < numberOfNodes; j++){
@@ -38,6 +39,7 @@ CandidateLists::CandidateLists(unsigned int numberOfNodes, unsigned int ** dista
         }
     }
 
+    #pragma omp parallel for
     for(unsigned int i = 0; i < numberOfNodes; i++){
         qsort(es[i], numberOfNodes, sizeof(Node), compare);
     }
@@ -53,6 +55,7 @@ CandidateLists::CandidateLists(unsigned int numberOfNodes, unsigned int ** dista
             if(t == numberOfTiers - 1){
                 tier_size = remainderTierSize;
             }
+    #pragma omp parallel for
     for(unsigned int n = 0; n < numberOfNodes; n++){
             cLists[tierIndex(t) + nodeListIndex(n,tier_size)] = tier_size;
             for(unsigned int j = 0; j < tier_size; j++){
@@ -78,17 +81,8 @@ unsigned int CandidateLists::getTierSize(unsigned int tier) const
     return CL_TIER_SIZE;
 } 
 
-unsigned int CandidateLists::findNodesDistance(unsigned int nodeA, unsigned int nodeB) const{
-    unsigned int tier_size = CL_TIER_SIZE;
-    for(unsigned int t = 0; t < numberOfTiers; t++){
-        if(t == numberOfTiers - 1)
-                tier_size = remainderTierSize;
-            for(unsigned int j = 0; j < tier_size; j++){
-                if(cLists[getExactNodeIndex(t,nodeA,j,tier_size)] == nodeB)
-                    return cLists[getExactDistanceIndex(t,nodeA,j,tier_size)];
-            }
-    }
-    return 0;
+unsigned int CandidateLists::nodeDistance(unsigned int nodeA, unsigned int nodeB) const{
+    return distances[nodeA][nodeB];
 }
 
 //TODO: Throw Exception if index's are out of bounds

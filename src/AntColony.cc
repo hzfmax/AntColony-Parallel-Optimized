@@ -11,6 +11,7 @@
 #include "Tour.h"
 #include "CandidateLists.h"
 #include <omp.h>
+#include "ThreeOpt.h"
 using namespace std;
 constexpr float minimum_p = numeric_limits<float>::epsilon();
 
@@ -30,7 +31,6 @@ AntColony::AntColony(const std::vector<std::pair<float,float>> &symmetricCoordin
     }
     initDistanceMatrix(distances);
     candidateLists = new CandidateLists(numberOfNodes, distances);
-    delete_2D_array<unsigned int>(numberOfNodes, numberOfNodes, distances);
 }
 
 AntColony::~AntColony(){
@@ -44,6 +44,7 @@ AntColony& AntColony::optimize(int iterations , int numberOfAnts, float rho , fl
 {
     setParameters(iterations, numberOfAnts, rho, beta, decay, qExplorationFactor);
     reset();
+    ThreeOpt opt(tours[0], candidateLists);
     
     for (int i = 0; i < iterations; i++)
     {
@@ -52,8 +53,9 @@ AntColony& AntColony::optimize(int iterations , int numberOfAnts, float rho , fl
         #pragma omp parallel for
         for (int a = 0; a < numberOfAnts; a++)
         {
-            // while (!findAntTour(a));
             findAntTour(a);
+            ThreeOpt opt(tours[a], candidateLists);
+            opt.optimize();
         }
     
         findBestTour();
@@ -65,7 +67,6 @@ AntColony& AntColony::setParameters(int iterations, int numberOfAnts, float rho,
 {
         this->iterations = iterations;
         if(this->numberOfAnts != numberOfAnts){
-        //delete_2D_array(this->numberOfAnts, numberOfNodes + 1, tours);
         this->numberOfAnts = numberOfAnts;
         }
         this->rho = rho;
@@ -76,6 +77,9 @@ AntColony& AntColony::setParameters(int iterations, int numberOfAnts, float rho,
 }
 
 void AntColony::reset(){
+    for(int i = 0; i < tours.size(); i++){
+        tours[i]->reset();
+    }
     for(int i = tours.size(); i < numberOfAnts; i++) {
         tours.push_back(new Tour(numberOfNodes, candidateLists));
     }
@@ -101,11 +105,9 @@ void AntColony::reset(){
 
 void AntColony::nearistNeighbor(int node){
     Tour* t = tours[0];
-    t->add(node, 0);
+    t->add(node);
     for(int i = 1; i < numberOfNodes; i++){
-        Node n;
-        t->nextUnvisitedNode(n); // When we no longer have fully connected symetrical graphs, this will need to be an if
-        t->add(n);
+        t->add(t->nextUnvisitedNode());
     }
 }
 
@@ -126,57 +128,62 @@ bool AntColony::findAntTour(int ant)
     
     uniform_int_distribution<int> random_value(0, numberOfNodes - 1);
     
-    tour->add(random_value(generator), 0);
+    tour->add(random_value(generator));
+
     for (int i = 1; i < numberOfNodes; i++)
     {
         int node = tour->getNode(i-1);
-        Node choice;
-        chooseNextNode(tour, node, choice);
-        tour->add(choice);
+        tour->add(chooseNextNode(tour, node));
+
         #pragma omp critical
         {
-            updateLocalPheromone(node,choice.nodeId);
+            updateLocalPheromone(node,tour->getNode(i));
         }
     }
-    updateLocalPheromone(tour->getNode(numberOfNodes-1),tour->getNode(numberOfNodes));
+    #pragma omp critical
+        {
+            updateLocalPheromone(tour->getNode(numberOfNodes-1),tour->getNode(0));
+        }
+
     return true;
 }
 
 // Takes in the current city returns the choice for where to move to next // State Transition Rule
-void AntColony::chooseNextNode(Tour * tour, int currentNode, Node & n)
+unsigned int AntColony::chooseNextNode(Tour * tour, unsigned int currentNode)
 {
     std::uniform_real_distribution<float> random_value(0.0, 1.0);
     float q = random_value(generator);
     
     if (q < q0)
     {
-        maxPheromoneChoice(tour, currentNode, n);
+        return maxPheromoneChoice(tour, currentNode);
     }
-    tour->nextUnvisitedNode(n); // When we no longer have fully connected symetrical graphs, this will need to be an if
+    return tour->nextUnvisitedNode(); // When we no longer have fully connected symetrical graphs, this will need to be an if
 }
 
-void AntColony::maxPheromoneChoice(Tour * tour, int currentNode, Node & best)
+unsigned int AntColony::maxPheromoneChoice(Tour * tour, unsigned int node)
 {
     float max = numeric_limits<float>::min();
     float current;
-    Node n;
-    tour->nextUnvisitedNode(n);
-    unsigned int elementsLeft = candidateLists->getNumberLeftInTier(tour->getCurrentSearchTier(), currentNode);
+    unsigned int neighbor = tour->nextUnvisitedNode();
+    unsigned int best = neighbor;
+    unsigned int elementsLeft = candidateLists->getNumberLeftInTier(tour->getCurrentSearchTier(), node);
     for(unsigned int i = 1; i < elementsLeft; i++)
     {
-        current = pheromones[currentNode][n.nodeId] * distanceHeuristic(n.distance);
+        current = pheromones[node][neighbor] * distanceHeuristic(node, neighbor);
         if (current > max)
         {
-            best = n;
+            best = neighbor;
             max = current;
         }
-        tour->nextUnvisitedNode(n);
+        neighbor = tour->nextUnvisitedNode();
     }
+    return best;
 }
 
-inline float AntColony::distanceHeuristic(unsigned int d)
+inline float AntColony::distanceHeuristic(unsigned int nodeA, unsigned int nodeB)
 {
-    return pow(1 / ((float) d), beta);
+    return pow(1 / ((float) candidateLists->nodeDistance(nodeA,nodeB)), beta);
 }
 
 //** The Ant Colony System removed the biased exploration after implementing 3opt.
@@ -223,11 +230,11 @@ void AntColony::updateGlobalPheromones()
     #pragma omp parallel for
     for (int i = 0; i < numberOfNodes; i++)
     {
-        for (int j = i; j < numberOfNodes; j++)
+        for (int j = 0; j < numberOfNodes; j++)
         {
             if(i == j) continue;
             pheromones[i][j] = (1 - decay) * pheromones[i][j] + decay * deltaPheromones(i, j);
-            pheromones[j][i] = pheromones[i][j];
+             // pheromones[j][i] = pheromones[i][j];
         }
     }
 }
@@ -271,9 +278,9 @@ int AntColony::distance(int nodeA, int nodeB)
 void AntColony::initDistanceMatrix(unsigned int ** distances){
     #pragma omp parallel for
     for(int i = 0; i < numberOfNodes; i++){
-        for(int j = i; j < numberOfNodes; j++){
+        for(int j = 0; j < numberOfNodes; j++){
             distances[i][j] = distance(i,j);
-            distances[j][i] = distances[i][j];
+            // distances[j][i] = distances[i][j];
         }
     }
 }

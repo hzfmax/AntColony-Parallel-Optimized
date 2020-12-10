@@ -66,8 +66,8 @@ private:
 
     void updateLocalPheromone(int nodeA, int nodeB); // We will use the pheromoneMatrix[nodeA][nodeB] = (1 - Rho)*pheromoneMatrix[nodeA][nodeB] + (Rho)*initialPheremoneLevelOfedge
 
-    void chooseNextNode(Tour * tour, int currentNode, Node & n); // Takes in the current city returns the choice for where to move to next // State Transition Rule
-    void maxPheromoneChoice(Tour * tour, int currentNode, Node & best);
+    unsigned int chooseNextNode(Tour * tour, unsigned int currentNode); // Takes in the current city returns the choice for where to move to next // State Transition Rule
+    unsigned int maxPheromoneChoice(Tour * tour, unsigned int currentNode);
     // Node biasedExplorationChoice(int ant, int currentNode); // This is the biased Exploration from the original Ant System algorithm, use when random is below a certian threshold
     // float probabilityCalculation(int nodeA, int nodeB, unsigned int d);
 
@@ -77,7 +77,7 @@ private:
     float deltaPheromones(int nodeA, int nodeB);
 
     int distance(int nodeA, int nodeB);
-    float distanceHeuristic(unsigned int d);
+    float distanceHeuristic(unsigned int nodeA, unsigned int nodeB);
     // bool exists(int nodeA, int nodeB); // Depracted until I add more support for different types of graphs
     // void resetTour(int ant);
 };

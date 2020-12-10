@@ -5,7 +5,7 @@
 class Tour{
 public:
     Tour() = delete;
-    Tour(unsigned int nodes, CandidateLists * cl);
+    Tour(unsigned int nodes, const CandidateLists * cl);
     void add(unsigned int node);
     unsigned int getNode(unsigned int index);
     unsigned long getTotalTourDistance();
@@ -27,7 +27,7 @@ private:
     unsigned int * position;
     unsigned int * tour;
     unsigned int numberOfNodes;
-    CandidateLists * candidateLists;
+    const CandidateLists * candidateLists;
     unsigned long totalTourDistance = 0;
     unsigned int size = 0;
     bool searching = false;

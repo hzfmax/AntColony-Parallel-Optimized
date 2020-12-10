@@ -13,8 +13,8 @@ ThreeOpt::ThreeOpt(Tour* tour, CandidateLists* cl) {
 }
 
 long ThreeOpt::gainFrom2Opt(unsigned int x1, unsigned int x2, unsigned int y1, unsigned int y2){
-    long delLength =  cl->nodeDistance(x1, x2) + cl->nodeDistance(y1,y2);
-    long addLength =  cl->nodeDistance(x1, y1) + cl->nodeDistance(x2,y2);
+    long delLength =  cl->distance(x1, x2) + cl->distance(y1,y2);
+    long addLength =  cl->distance(x1, y1) + cl->distance(x2,y2);
     return delLength - addLength;
 }
 
@@ -22,14 +22,16 @@ long ThreeOpt::gainFrom3Opt(unsigned int x1, unsigned int x2, unsigned int y1, u
     long addLength = 0;
     switch(c){
         case case6:
-            addLength = cl->nodeDistance(x1, y2) + cl->nodeDistance(z1, y1) + cl->nodeDistance(x2, z2);
+            addLength = cl->distance(x1, y2) + cl->distance(z1, y1) + cl->distance(x2, z2);
             break;
         case case7:
-            addLength = cl->nodeDistance(x1, y2) + cl->nodeDistance(z1, x2) + cl->nodeDistance(y1, z2);
+            addLength = cl->distance(x1, y2) + cl->distance(z1, x2) + cl->distance(y1, z2);
+            break;
+        case case1:
             break;
     }
 
-     long delLength = cl->nodeDistance(x1, x2) + cl->nodeDistance(y1, y2) + cl->nodeDistance(z1, z2);
+     long delLength = cl->distance(x1, x2) + cl->distance(y1, y2) + cl->distance(z1, z2);
      return delLength - addLength;
 }
 
@@ -57,7 +59,6 @@ bool ThreeOpt::oneCity3Opt(unsigned int start){
     bool improved = false;
     unsigned int N = cl->getNumberOfNodes();
     unsigned int i, j;
-    constexpr unsigned int TIER = 0;
     long gainExpected = 0;
     Move goodMove(0,0,0,case1,0);
     for(int toggle = 0; toggle < 2; toggle++){
@@ -68,8 +69,8 @@ bool ThreeOpt::oneCity3Opt(unsigned int start){
         unsigned int x1 = tour->getNode(i);
         unsigned int x2 = tour->getNode((i+1) % N);
 
-        for(unsigned int neighborIndex1 = 0; neighborIndex1 < cl->getTierSize(TIER); neighborIndex1++){
-            unsigned int y2 = cl->getNode(TIER,x1,neighborIndex1);
+        for(unsigned int neighborIndex1 = 0; neighborIndex1 < cl->size(); neighborIndex1++){
+            unsigned int y2 = cl->getNode(x1,neighborIndex1);
             j = (tour->getNodePositionInTour(y2) + N - 1) % N;
             unsigned int y1 = tour->getNode(j);
 
@@ -81,8 +82,8 @@ bool ThreeOpt::oneCity3Opt(unsigned int start){
                 }
             }
 
-            for(unsigned int neighborIndex2 = 0; neighborIndex2 < cl->getTierSize(TIER); neighborIndex2++){
-                unsigned int z1_6 = cl->getNode(TIER,y1,neighborIndex2);
+            for(unsigned int neighborIndex2 = 0; neighborIndex2 < cl->size(); neighborIndex2++){
+                unsigned int z1_6 = cl->getNode(y1,neighborIndex2);
                 unsigned int k_6 = tour->getNodePositionInTour(z1_6);
                 unsigned int z2_6 = tour->getNode((k_6 + 1) % N);
                 

@@ -5,7 +5,7 @@ using namespace std;
 
 void swap(unsigned int * arr, unsigned int i, unsigned int j);
 
-Tour::Tour(unsigned int nodes, CandidateLists * cl): numberOfNodes(nodes), candidateLists(cl){
+Tour::Tour(unsigned int nodes, const CandidateLists * cl): numberOfNodes(nodes), candidateLists(cl){
     tour = new unsigned int [numberOfNodes];
     v = new bool[numberOfNodes];
     position = new unsigned int[numberOfNodes];
@@ -19,30 +19,25 @@ Tour::~Tour(){
 
 unsigned int Tour::nextUnvisitedNode() {
     unsigned int nodeId = tour[size-1];
+    unsigned int nextNode = 0;
     if(!searching){
         searching = true;
-        currentSearchingTier = 0;
         lastSearchedIndex = 0;
-        currentTierList = candidateLists->getTierList(currentSearchingTier, nodeId);
     }
 
-    while(currentSearchingTier < candidateLists->getNumberOfTiers() ){    
-        for(unsigned int i = lastSearchedIndex; i < candidateLists->getTierSize(currentSearchingTier); i++ ){
-            if(!visited(currentTierList[i])){
-                lastSearchedIndex = i;
-                return currentTierList[lastSearchedIndex];
+    for(unsigned int i = lastSearchedIndex; i < numberOfNodes; i++ ){
+        nextNode = candidateLists->getNode(nodeId,i);
+        if(!visited(nextNode)){
+            lastSearchedIndex = i;
+            break;
             }
-        }
-        currentSearchingTier++;
-        currentTierList = candidateLists->getTierList(currentSearchingTier,nodeId);
     }
-    return currentTierList[lastSearchedIndex];
+    return nextNode;
 }
 
-// TODO: throw an error if trying to add to something when no room - default constructor will do this
 void Tour::add(unsigned int node){
     if(isTourComplete())
-        return; // TO DO: Make this throw an exception instead;
+        throw range_error("Tour.add(node): Tour is full, cannot add any more items to it. node: "s + std::to_string(node)); // TO DO: Make this throw an exception instead;
     position[node] = size;
     tour[size] = node;
     size++; 
@@ -51,7 +46,6 @@ void Tour::add(unsigned int node){
     searching = false;
 }
 
-//To Do: implement reversal from index i to k
 void Tour::reverse(unsigned int start, unsigned int end){
     changed = true;
     unsigned int size = ((end - start + 1 + numberOfNodes) % numberOfNodes) / 2;
@@ -67,6 +61,8 @@ void Tour::reverse(unsigned int start, unsigned int end){
 }
 
 unsigned int Tour::getNode(unsigned int index) {
+    if(index >= numberOfNodes)
+        throw range_error("Tour.getNode(index): index out of bounds: "s + std::to_string(index));
     return tour[index];
 }
 
@@ -74,7 +70,7 @@ unsigned long Tour::getTotalTourDistance(){
     totalTourDistance = 0;
     if(changed){
     for(unsigned int i = 1; i < size; i++){
-        totalTourDistance += candidateLists->nodeDistance(tour[i-1], tour[i]);
+        totalTourDistance += candidateLists->distance(tour[i-1], tour[i]);
     }
     }
     return totalTourDistance;
@@ -109,9 +105,9 @@ bool Tour::visited(unsigned int node) const{
 
 void Tour::printTour(){
     for(unsigned int i = 0; i < size - 1; i++){
-        cout << "(" << tour[i] << "," << candidateLists->nodeDistance(tour[i], tour[i+1]) << ") -> ";
+        cout << "(" << tour[i] << "," << candidateLists->distance(tour[i], tour[i+1]) << ") -> ";
     }
-    cout << "(" << tour[size - 1] << "," << candidateLists->nodeDistance(tour[size - 1], tour[0]) << ")" << endl;
+    cout << "(" << tour[size - 1] << "," << candidateLists->distance(tour[size - 1], tour[0]) << ")" << endl;
 }
 
 unsigned int Tour::getNodePositionInTour(unsigned int node){

@@ -4,7 +4,7 @@ CC := g++
 
 SRCDIR := src
 BUILDDIR := build
-TARGET := bin/antColony
+TARGET := bin/antColony-CL
 
 SRCEXT := cc
 SOURCES := $(shell find $(SRCDIR) -type f -name *.$(SRCEXT))

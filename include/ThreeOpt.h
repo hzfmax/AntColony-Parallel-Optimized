@@ -25,15 +25,16 @@ struct Move {
 class ThreeOpt{
     public:
     ThreeOpt(Tour* tour, CandidateLists * cl);
+    ~ThreeOpt();
     void optimize();
+    
+    private:
     long gainFrom2Opt(unsigned int x1, unsigned int x2, unsigned int y1, unsigned int y2);
     long gainFrom3Opt(unsigned int x1, unsigned int x2, unsigned int y1, unsigned int y2, unsigned int z1, unsigned int z2, OptCase c);
     void makeMove(const Move& move);
     bool oneCity3Opt(unsigned int start);
     void clearDLB();
     bool between(unsigned int a, unsigned int x, unsigned int b);
-    
-    private:
     Tour* tour;
     CandidateLists *cl;
     bool* dontLookBit;

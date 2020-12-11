@@ -8,8 +8,12 @@ using namespace std;
 ThreeOpt::ThreeOpt(Tour* tour, CandidateLists* cl) {
     this->tour = tour;
     this->cl = cl;
-    this->dontLookBit = new bool[cl->getNumberOfNodes()];
+    dontLookBit = new bool[cl->getNumberOfNodes()];
     clearDLB();
+}
+
+ThreeOpt::~ThreeOpt() {
+    delete[] dontLookBit;
 }
 
 long ThreeOpt::gainFrom2Opt(unsigned int x1, unsigned int x2, unsigned int y1, unsigned int y2){

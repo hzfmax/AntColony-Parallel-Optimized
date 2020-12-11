@@ -7,6 +7,7 @@
 #include <ctype.h>
 #include <sstream>
 #include "timer.h"
+#include "write_results.h"
 using namespace std;
 
 vector<pair<float, float>> readTspFile(const string & filename);

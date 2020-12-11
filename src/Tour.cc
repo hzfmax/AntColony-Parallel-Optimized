@@ -1,81 +1,90 @@
 #include "Tour.h"
 #include <iostream>
-#define distanceIndex(i) numberOfNodes + i
-#define nodeIndex(i) i
+
 using namespace std;
 
-Tour::Tour(unsigned int nodes, CandidateLists * cl): numberOfNodes(nodes), candidateLists(cl){
-    tour = new unsigned int [(numberOfNodes+1)*2];
+void swap(unsigned int * arr, unsigned int i, unsigned int j);
+
+Tour::Tour(unsigned int nodes, const CandidateLists * cl): numberOfNodes(nodes), candidateLists(cl){
+    tour = new unsigned int [numberOfNodes];
     v = new bool[numberOfNodes];
+    position = new unsigned int[numberOfNodes];
 }
 
 Tour::~Tour(){
     delete[] tour;
     delete[] v;
+    delete[] position;
 }
 
-bool Tour::nextUnvisitedNode(Node & n) {
+unsigned int Tour::nextUnvisitedNode() {
     unsigned int nodeId = tour[size-1];
+    unsigned int nextNode = 0;
     if(!searching){
         searching = true;
-        currentSearchingTier = 0;
         lastSearchedIndex = 0;
-        currentTierList = candidateLists->getTierList(currentSearchingTier, nodeId);
     }
 
-    while(currentSearchingTier < candidateLists->getNumberOfTiers() ){    
-        for(unsigned int i = lastSearchedIndex; i < candidateLists->getTierSize(currentSearchingTier); i++ ){
-            if(!visited(currentTierList[i])){
-                lastSearchedIndex = i;
-                n.nodeId = currentTierList[lastSearchedIndex];
-                n.distance = candidateLists->getDistance(currentSearchingTier,nodeId,lastSearchedIndex);
-                return true;
+    for(unsigned int i = lastSearchedIndex; i < numberOfNodes; i++ ){
+        nextNode = candidateLists->getNode(nodeId,i);
+        if(!visited(nextNode)){
+            lastSearchedIndex = i;
+            break;
             }
-        }
-        currentSearchingTier++;
-        currentTierList = candidateLists->getTierList(currentSearchingTier,nodeId);
     }
-    return false;
+    return nextNode;
 }
 
-// TODO: throw an error if trying to add to something when no room - default constructor will do this
-void Tour::add(unsigned int node, unsigned int distance){
+void Tour::add(unsigned int node){
     if(isTourComplete())
-        return; // TO DO: Make this throw an exception instead;
-
-    tour[nodeIndex(size)] = node;
-    tour[distanceIndex(size)] = distance;
-    totalTourDistance += distance;
+        throw range_error("Tour.add(node): Tour is full, cannot add any more items to it. node: "s + std::to_string(node)); // TO DO: Make this throw an exception instead;
+    position[node] = size;
+    tour[size] = node;
     size++; 
     v[node] = true;
+    changed = true;
     searching = false;
-    if(size == numberOfNodes)
-        add(getNode(0), candidateLists->findNodesDistance(node,getNode(0) ));
 }
 
-void Tour::add(Node n){
-    add(n.nodeId, n.distance);
+void Tour::reverse(unsigned int start, unsigned int end){
+    changed = true;
+    unsigned int size = ((end - start + 1 + numberOfNodes) % numberOfNodes) / 2;
+    unsigned int left = start;
+    unsigned int right = end;
+    for(unsigned int i = 0; i < size; i++){
+        swap(tour, left, right);
+        position[tour[left]] = left;
+        position[tour[right]] = right;
+        left = (left + 1) % numberOfNodes;
+        right = (numberOfNodes + right - 1) % numberOfNodes;
+    }
 }
 
 unsigned int Tour::getNode(unsigned int index) {
-    if(index >= size)
-        return -1; // TO DO: Throw an exception instead;
-    return tour[nodeIndex(index)];
+    if(index >= numberOfNodes)
+        throw range_error("Tour.getNode(index): index out of bounds: "s + std::to_string(index));
+    return tour[index];
 }
-unsigned int Tour::getDistance(unsigned int index) {
-    if(index >= size)
-        return -1; // TO DO: Throw an exception instead;
-    return tour[distanceIndex(index)];
-}
+
 unsigned long Tour::getTotalTourDistance(){
+    totalTourDistance = 0;
+    if(changed){
+    for(unsigned int i = 1; i < size; i++){
+        totalTourDistance += candidateLists->distance(tour[i-1], tour[i]);
+    }
+    }
     return totalTourDistance;
 }
 bool Tour::isTourComplete(){
-    return size == numberOfNodes + 1;
+    return size == numberOfNodes;
 }
 void Tour::reset(){
-    for(unsigned int i = 0; i < numberOfNodes; i++)
+    #pragma omp parallel for
+    for(unsigned int i = 0; i < numberOfNodes; i++){
         v[i] = false;
+        position[i] = 0;
+        changed = false;
+    }
     totalTourDistance = 0;
     size = 0;
 }
@@ -96,7 +105,18 @@ bool Tour::visited(unsigned int node) const{
 
 void Tour::printTour(){
     for(unsigned int i = 0; i < size - 1; i++){
-        cout << "(" << getNode(i) << "," << getDistance(i) << ") -> ";
+        cout << "(" << tour[i] << "," << candidateLists->distance(tour[i], tour[i+1]) << ") -> ";
     }
-    cout << "(" << getNode(size - 1) << "," << getDistance(size - 1) << ")\n";
+    cout << "(" << tour[size - 1] << "," << candidateLists->distance(tour[size - 1], tour[0]) << ")" << endl;
+}
+
+unsigned int Tour::getNodePositionInTour(unsigned int node){
+    return position[node];
+}
+
+
+void swap(unsigned int * arr, unsigned int i, unsigned int j){
+    unsigned int t = arr[i];
+    arr[i] = arr[j];
+    arr[j] = t;
 }

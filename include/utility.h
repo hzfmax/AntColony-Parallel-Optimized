@@ -10,18 +10,17 @@ void delete_2D_array(int rows, int columns, T ** arr);
 
 template<typename T>
 T**  new_2D_array(int rows, int columns){
-    T** temp = new T*[rows];
-    for(int i = 0; i < columns; i++)
+    T* flat = new T[rows*columns];
+    T** two_D = new T*[rows];
+    for(int i = 0; i < rows; i++)
     {
-        temp[i] = new T[columns];
+        two_D[i] =  flat + i*rows;
     }
-    return temp;
+    return two_D;
 }
 template<typename T>
 void delete_2D_array(int rows, int columns, T ** arr){
-    for(int i = 0; i < columns; i++){
-        delete[] arr[i];
-    }
+    delete[] arr[0];
     delete[] arr;
 }
 

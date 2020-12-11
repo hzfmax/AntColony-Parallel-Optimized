@@ -9,6 +9,7 @@
 #include "timer.h"
 #include "write_results.h"
 #include <omp.h>
+#include <stdexcept>
 using namespace std;
 
 vector<pair<float, float>> readTspFile(const string & filename);
@@ -30,16 +31,23 @@ int main(int argc, char * argv[])
     if(numberOfPoints){
     tspData.resize(numberOfPoints);
     }
+    try{
     initialize_timer();
     AntColony ac(tspData);
     start_timer();
     ac.optimize(iterations);
     stop_timer();
+    
 
     cout << "The best tour length was: " << ac.getShortestTourLength() << " Found in :" << elapsed_time() << endl;
+    
     char data [250];
     sprintf(data, "%lf", elapsed_time());
     writeResults("Time", data);
+    }
+    catch(const exception &e){
+        cerr << e.what() << endl;
+    }
     return 0;
 }
 

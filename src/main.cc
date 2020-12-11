@@ -17,17 +17,27 @@ int main(int argc, char * argv[])
         cerr << "Missing required argumenets. Please provide a .tsp file for proccessing\n";
         return -1;
     }
-    int iterations = 100;
+    int iterations = 1;
+    int numberOfPoints = 0;
     if(argc > 2)
         iterations = atoi(argv[2]);
+     if(argc > 3)
+         numberOfPoints =atoi(argv[3]);
+    
     vector<pair<float, float>> tspData = readTspFile(argv[1]);
+    if(numberOfPoints){
+    tspData.resize(numberOfPoints);
+    }
     initialize_timer();
     AntColony ac(tspData);
     start_timer();
     ac.optimize(iterations);
     stop_timer();
-    ac.printCurrentState();
+
     cout << "The best tour length was: " << ac.getShortestTourLength() << " Found in :" << elapsed_time() << endl;
+    char data [250];
+    sprintf(data, "%lf", elapsed_time());
+    writeResults("Time", data);
     return 0;
 }
 
